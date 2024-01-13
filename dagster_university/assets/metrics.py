@@ -1,4 +1,3 @@
-from dagster import asset
 import duckdb
 import os
 
@@ -7,29 +6,34 @@ import plotly.io as pio
 import geopandas as gpd
 import pandas as pd
 from datetime import datetime, timedelta
+from dagster import asset
+from dagster_duckdb import DuckDBResource
 
 from . import constants
 
+# assets/metrics.py
+
 
 @asset(deps=["taxi_trips", "taxi_zones"])
-def manhattan_stats():
+def manhattan_stats(database: DuckDBResource):
     """
-    calc stats
-    """
-    query = """
-        select
-            zones.zone,
-            zones.borough,
-            zones.geometry,
-            count(1) as num_trips,
-        from trips
-        left join zones on trips.pickup_zone_id = zones.zone_id
-        where borough = 'Manhattan' and geometry is not null
-        group by zone, borough, geometry
+    Metrics on taxi trips in Manhattan
     """
 
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
-    trips_by_zone = conn.execute(query).fetch_df()
+    query = """
+    select
+      zones.zone,
+      zones.borough,
+      zones.geometry,
+      count(1) as num_trips,
+    from trips
+    left join zones on trips.pickup_zone_id = zones.zone_id
+    where geometry is not null
+    group by zone, borough, geometry
+  """
+
+    with database.get_connection() as conn:
+        trips_by_zone = conn.execute(query).fetch_df()
 
     trips_by_zone["geometry"] = gpd.GeoSeries.from_wkt(trips_by_zone["geometry"])
     trips_by_zone = gpd.GeoDataFrame(trips_by_zone)
@@ -60,12 +64,13 @@ def manhattan_map():
     pio.write_image(fig, constants.MANHATTAN_MAP_FILE_PATH)
 
 
-@asset(deps=["taxi_trips"])
-def trips_by_week():
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
+# assets/metrics.py
 
-    current_date = datetime.strptime("2023-03-01", constants.DATE_FORMAT)
-    end_date = datetime.strptime("2023-04-01", constants.DATE_FORMAT)
+
+@asset(deps=["taxi_trips"])
+def trips_by_week(database: DuckDBResource):
+    current_date = datetime.strptime("2023-01-01", constants.DATE_FORMAT)
+    end_date = datetime.now()
 
     result = pd.DataFrame()
 
@@ -73,12 +78,13 @@ def trips_by_week():
         current_date_str = current_date.strftime(constants.DATE_FORMAT)
         query = f"""
             select
-                vendor_id, total_amount, trip_distance, passenger_count
+            vendor_id, total_amount, trip_distance, passenger_count
             from trips
-            where date_trunc('week', pickup_datetime) = date_trunc('week', '{current_date_str}'::date)
+            where pickup_datetime >= '{current_date_str}' and pickup_datetime < '{current_date_str}'::date + interval '1 week'
         """
 
-        data_for_week = conn.execute(query).fetch_df()
+        with database.get_connection() as conn:
+            data_for_week = conn.execute(query).fetch_df()
 
         aggregate = (
             data_for_week.agg(
