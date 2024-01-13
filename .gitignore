@@ -172,7 +172,7 @@ outputs
 *.err
 *.out
 *.complete
-
+*tmp*
 # separate files
 taxi_trips_file
 taxi_zones_file
