@@ -1,10 +1,11 @@
-from dagster import Config, asset
+from dagster import Config, asset, MetadataValue, AssetIn
 from dagster_duckdb import DuckDBResource
 
 import plotly.express as px
 import plotly.io as pio
 
 from . import constants
+import base64
 
 
 class AdhocRequestConfig(Config):
@@ -14,8 +15,14 @@ class AdhocRequestConfig(Config):
     end_date: str
 
 
-@asset(deps=["taxi_zones", "taxi_trips"])
-def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource):
+@asset
+def adhoc_request(
+    context,
+    taxi_zones,
+    taxi_trips,
+    config: AdhocRequestConfig,
+    database: DuckDBResource,
+):
     """
     The response to an request made in the `requests` directory.
     See `requests/README.md` for more information.
@@ -72,3 +79,9 @@ def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource):
     )
 
     pio.write_image(fig, file_path)
+    with open(file_path, "rb") as file:
+        image_data = file.read()
+    base64_data = base64.b64encode(image_data).decode("utf-8")
+    md_content = f"![Image](data:image/jpeg;base64,{base64_data})"
+
+    context.add_output_metadata({"preview": MetadataValue.md(md_content)})

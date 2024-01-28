@@ -1,7 +1,6 @@
 # dagster_university
 
-This is a [Dagster](https://dagster.io/) project made to accompany Dagster University coursework.
-
+This is a [Dagster](https://dagster.io/) project made to accompany Dagster University coursework based on NYC taxi trip data
 ## Getting started
 
 First, install your Dagster code location as a Python package by running the command below in your terminal. By using the --editable (`-e`) flag, pip will install your Python package in ["editable mode"](https://pip.pypa.io/en/latest/topics/local-project-installs/#editable-installs) so that as you develop, local code changes will automatically apply.
